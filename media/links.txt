@@ -1,0 +1,3 @@
+https://www.wikiwand.com/en/Inverse_transform_sampling
+https://github.com/scipy/scipy/blob/v1.7.1/scipy/stats/_discrete_distns.py
+https://github.com/numpy/numpy/blob/623bc1fae1d47df24e7f1e29321d0c0ba2771ce0/numpy/random/src/legacy/legacy-distributions.c
