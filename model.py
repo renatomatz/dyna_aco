@@ -52,11 +52,8 @@ class VanillaDyna(Model):
         self.model[state][action] = [next_state, reward]
 
     def sample_state_action(self):
-        state_index = np.random.choice(range(len(self.model.keys())))
-        state = list(self.model)[state_index]
-
-        action_index = np.random.choice(range(len(self.model[state].keys())))
-        action = list(self.model[state])[action_index]
+        state = np.random.choice(list(self.model.keys()))
+        action = np.random.choice(list(self.model[state].keys()))
 
         return state, action
 
@@ -75,7 +72,6 @@ class TimeDyna(VanillaDyna):
         self.time_weight = time_weight
 
     def feed(self, state, action, next_state, reward):
-        self.time += 1
         if state not in self.model.keys():
             self.model[state] = dict()
 
@@ -96,5 +92,71 @@ class TimeDyna(VanillaDyna):
 
         # adjust reward with elapsed time since last vist
         reward += self.time_weight * np.sqrt(self.time - time)
+
+        return state, action, next_state, reward
+
+
+class _NonDeterministicDyna(VanillaDyna):
+
+    def _mc_dict(self):
+        return {
+            "visits": 0,
+            "reward": 0,
+            "dynamics": np.zeros(self.env.shape[0]),
+        }
+
+
+class NonDetermVanillaDyna(_NonDeterministicDyna):
+
+    def feed(self, state, action, next_state, reward):
+        if state not in self.model.keys():
+            self.model[state] = dict()
+        if action not in self.model[state].keys():
+            self.model[state][action] = self._mc_dict()
+
+        self.model[state][action]["visits"] += 1
+        self.model[state][action]["reward"] += reward
+        self.model[state][action]["dynamics"][next_state] += 1
+
+    def sample(self):
+        state, action = self.sample_state_action()
+        mc_dict = self.model[state][action]
+        reward = mc_dict["reward"] / mc_dict["visits"]
+        next_state = np.random.choice(np.arange(len(mc_dict["dynamics"])),
+                                      p=mc_dict["dynamics"]/mc_dict["visits"])
+
+        return state, action, next_state, reward
+
+
+class NonDetermTimeDyna(NonDetermVanillaDyna, TimeDyna):
+
+    def _mc_dict(self):
+        return super()._mc_dict() | {
+            "time": 1,
+        }
+
+    def feed(self, state, action, next_state, reward):
+
+        if state not in self.model.keys():
+            self.model[state] = dict()
+
+            # Actions that had never been tried before from a state were
+            #   allowed to be considered in the planning step
+            for action_ in self.env.actions:
+                if action_ != action:
+                    # Such actions would lead back to the same state with a
+                    #   reward of zero
+                    # Notice that we use the default time of 1
+                    super().feed(state, action_, state, 0)
+
+        super().feed(state, action, next_state, reward)
+        self.model[state][action]["time"] = self.time
+
+    def sample(self):
+        state, action, next_state, reward = super().sample()
+
+        # adjust reward with elapsed time since last vist
+        reward += (self.time_weight
+                   * np.sqrt(self.time - self.model[state][action]["time"]))
 
         return state, action, next_state, reward

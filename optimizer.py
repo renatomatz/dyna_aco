@@ -33,8 +33,7 @@ class Optimizer:
                 rewards_history.append(self.agent.discounted_rewards())
                 self.agent.clear_history()
 
-            _, state, _, done = \
-                self.episode(state)
+            _, state, _, done = self.episode(state)
 
         rewards_history.append(self.agent.discounted_rewards())
         return rewards_history
@@ -52,7 +51,7 @@ class QLearning(Optimizer):
         self.eps = eps
 
     def episode(self, state):
-        self.agent.age += 1
+        self.agent.start_episode()
 
         action = self.choose_action(state)
 
@@ -69,7 +68,9 @@ class QLearning(Optimizer):
         return action, next_state, reward, done
 
     def choose_action(self, state):
-        """Make decision based on the merits of the expected and instantaneous
+        """\epsilon-greedy policy.
+        
+        Make decision based on the merits of the expected and instantaneous
         utilities from a decision.
 
         Stuck agents will simply pick the state on which they were stuck on.
@@ -110,8 +111,7 @@ class DynaQ(QLearning):
         return self._model
 
     def episode(self, state):
-        action, next_state, reward, done = \
-            super().episode(state)
+        action, next_state, reward, done = super().episode(state)
 
         self.model.time += 1
 

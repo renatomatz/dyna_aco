@@ -12,7 +12,7 @@ have a similar interface as sequential executions.
 
 import numpy as np
 
-from utils import _jitted_discounted_lifetime, assert_type
+from utils import assert_type
 
 
 class Agent:
@@ -37,7 +37,10 @@ class Agent:
     def discounted_rewards(self):
         """Return total lifetime value of this agent."""
         rewards = np.array(self.history, dtype=np.float64)[:, 2]
-        return np.sum(rewards*(self.gamma**np.arange(len(rewards)))) 
+        return np.sum(rewards*(self.gamma**np.arange(len(rewards))))
+
+    def start_episode(self):
+        pass
 
 
 class McCallAgent(Agent):
@@ -56,6 +59,9 @@ class McCallAgent(Agent):
         """Return whether the agent is dead"""
         return self.age >= self.death_age
 
+    def start_episode(self):
+        self.age += 1
+
 
 class HuggettAgent(Agent):
 
@@ -66,6 +72,9 @@ class HuggettAgent(Agent):
         self.a = 0
 
     def utility(self, c):
+        # Consumption of zero causes an error, so instead, just return a large
+        # negative number. We can interpret this as starvation.
+        c = max(c, 0.000001)
         return (c**(1-self.crra_gamma))/(1-self.crra_gamma)
 
 

@@ -127,7 +127,7 @@ class FullMcCallModel(BaseMcCall):
             return self.draw(), self.c, False
 
 
-class HuggetModel(Environment):
+class HuggettModel(Environment):
     """Huget model of consumption and savings.
 
     Based on the 1993 paper by Mark Hugget
@@ -144,37 +144,45 @@ class HuggetModel(Environment):
         self.max_debt = max_debt
         self.R = 1 + r
 
-        self.actions = np.arange(0, max_assets+max_debt+1)
+        self.actions = np.arange(0, max_assets+max_debt)
 
         self.set_dist(200, 100)
 
     @property
     def shape(self):
         # You can consume as much as you want.
-        return (self.max_assets+self.max_debt)*2
+        # First (max_debt) indices are for negative income
+        return (self.max_assets+self.max_debt,)*2
 
     def set_dist(self, *args, **kwargs):
         self._draw = lambda: betabinom(self.max_assets // 10,
                                        *args, **kwargs).rvs(1)[0]
 
     def reset(self, agent):
-        return self.draw(), 0, False
+        agent.a = self.draw()
+        # we add max_debt to account for negative income
+        return self.max_debt + agent.a, 0, False
 
-    def step(self, agent, s, a):
+    def step(self, agent, state, action):
 
         self._check_agent(agent)
 
         # Keep in mind that agent.a are the agent's assets
         # Can't consume more than your assets and the maximum debt
-        a = min(a, agent.a + self.max_debt)
+        action = min(action, agent.a + self.max_debt)
 
         # Accrue/pay interest
-        agent.a += self.R*(self.a - a)
+        agent.a += self.R*(agent.a - action)
         # Get a salary draw
         agent.a += self.draw()
-        agent.a = min(agent.a, self.max_assets)
+        # Assets must be an integer
+        agent.a = int(agent.a)
 
-        return agent.a, agent.utility(a), False
+        # Assets are capped
+        agent.a = min(agent.a, self.max_assets)
+        agent.a = max(agent.a, 0)
+
+        return agent.a + self.max_debt, agent.utility(action), False
 
     def possible_actions(self, agent):
         return self.actions[self.actions <= (agent.a + self.max_debt)]
