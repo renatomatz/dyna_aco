@@ -1,3 +1,5 @@
+from collections.abc import Iterable
+
 import multiprocessing as mp
 import numpy as np
 import matplotlib.pyplot as plt
@@ -61,6 +63,33 @@ class _AntHandler(mp.Process, _NamespaceHandler):
         self.seed = type(self).handlers
 
 
+class SamplingQueue:
+
+    def __init__(self, shape):
+        self.shape = shape
+        self.maxsize = shape[0]
+        self.data = np.empty(shape)
+        self.len = 0
+        self.i = 0
+
+    @property
+    def next_i(self):
+        i, self.i = self.i, (self.i + 1) % self.maxsize
+        return i
+
+    def put_iter(self, item):
+        assert_type(item, Iterable, "item")
+        for it in item:
+            self.put(it)
+
+    def put(self, item):
+        self.data[self.next_i] = item
+        self.len = min(self.len + 1, self.maxsize)
+
+    def sample(self, size=1):
+        return self.data[np.random.randint(self.len, size=size)]
+
+
 def cycle_gen(n):
     i = 0
     while True:
@@ -120,8 +149,8 @@ def plot_arr(arr, ax=None, **plot_opts):
 
 # Jitted functions
 @njit
-def _jitted_discounted_lifetime(arr, n, beta):
-    return np.sum(arr*(beta**np.arange(n)))
+def _jitted_discounted_lifetime(arr, n, gamma):
+    return np.sum(arr*(gamma**np.gamma(n)))
 
 
 @njit

@@ -9,10 +9,7 @@ Updated by Renato Zimmermann
 * States are now a single number instead of coordinates
 """
 
-
 import numpy as np
-import matplotlib
-matplotlib.use('Agg')
 
 
 # a wrapper class for parameters of dyna algorithms
@@ -121,3 +118,50 @@ class TimeModel:
         reward += self.time_weight * np.sqrt(self.time - time)
 
         return state, action, next_state, reward
+
+
+# play for an episode for Dyna-Q algorithm
+# @q_value: state action pair values, will be updated
+# @model: model instance for planning
+# @maze: a maze instance containing all information about the environment
+# @dyna_params: several params for the algorithm
+def dyna_q(ant, q_value, model, env, dyna_params):
+    state, reward, done = env.reset()
+    steps = 0
+    while not done:
+        # track the steps
+        steps += 1
+
+        # get action
+        action = choose_action(state, q_value, env, dyna_params)
+
+        # take action
+        next_state, reward = env.step(ant, state, action)
+
+        # Q-Learning update
+        q_value[state, action] += (
+            dyna_params.alpha
+            * (reward + ant.gamma * np.max(q_value[next_state, :])
+               - q_value[state, action])
+        )
+
+        # feed the model with experience
+        model.feed(state, action, next_state, reward)
+
+        # sample experience from the model
+        for t in range(0, dyna_params.planning_steps):
+            state_, action_, next_state_, reward_ = model.sample()
+            q_value[state_, action_] += (
+                dyna_params.alpha
+                * (reward_ + dyna_params.gamma
+                   * np.max(q_value[next_state_, :])
+                   - q_value[state_, action_])
+            )
+
+        state = next_state
+
+        # check whether it has exceeded the step limit
+        if steps > env.max_steps:
+            break
+
+    return steps

@@ -1,108 +1,100 @@
-"""Define Model classes, which generally models value assignment.
-
-Models are what ants use to assign values to states based on their expectations
-and instantaneous rewards. This are where most of the economic models will be
-implemented, as they define how agents make choices.
-
-Models will additionally define the lifetime value of a certain history of
-model choices. This is necessary for pheromone updates as well as being useful
-statistics.
 """
+Copyright (C)
+2016-2018 Shangtong Zhang(zhangshangtong.cpp@gmail.com)
+2016 Kenta Shimada(hyperkentakun@gmail.com)
+Permission given to modify the code as long as you keep this
+declaration at the top
+
+Further modifications made by Renato Zimmermann(renatomatz@gmail.com)
+"""
+
 
 import numpy as np
 
+from environment import Environment
+from utils import assert_type
+
 
 class Model:
-    """Abstract Model class."""
+    # @env: the environment instance.
+    def __init__(self, env):
+        # track total time
+        self.time = 0
 
-    def reset(self, ant):
+        assert_type(env, Environment, var_name="env")
+        self._env = env
+        self.reset_model()
+
+    @property
+    def env(self):
+        return self._env
+
+    def reset_model(self):
+        self.model = dict()
+
+    # feed the model with previous experience
+    def feed(self, state, action, next_state, reward):
         raise NotImplementedError()
 
-    def step(self, ant, s, a):
+    def sample_state_action(self):
+        raise NotImplementedError()
+
+    # randomly sample from previous experience
+    def sample(self):
         raise NotImplementedError()
 
 
-class BaseMcCall(Model):
-    """McCall model of information and job search.
+class VanillaDyna(Model):
 
-    Based on the 1970 paper by J. J. McCall.
-    https://doi.org/10.2307/1879403
+    def feed(self, state, action, next_state, reward):
+        if state not in self.model.keys():
+            self.model[state] = dict()
+        self.model[state][action] = [next_state, reward]
 
-    Agents make decisions based on government benefits, salary prospects and a
-    time discount rate.
-    """
+    def sample_state_action(self):
+        state_index = np.random.choice(range(len(self.model.keys())))
+        state = list(self.model)[state_index]
 
-    def __init__(self, draw_salary_func, c=25):
-        self.draw_salary = draw_salary_func
-        self.c = c
+        action_index = np.random.choice(range(len(self.model[state].keys())))
+        action = list(self.model[state])[action_index]
 
-        self.actions = [0, 1]
+        return state, action
 
-    def reset(self, ant):
-        return self.draw_salary(), 0, False
+    def sample(self):
+        state, action = self.sample_state_action()
+        next_state, reward = self.model[state][action]
 
-
-class McCallModel(BaseMcCall):
-
-    def step(self, ant, s, a):
-        if a == 0:  # accept
-            if np.isfinite(ant.death_age):
-                lv = np.sum((ant.gamma**np.arange(ant.death_age
-                                                  - ant.age + 1))*s)
-            else:
-                lv = s / (1 - ant.gamma)
-            return -1, lv, True
-        elif ant.age < ant.death_age:  # reject and live on
-            return self.draw_salary(), self.c, False
-        else:  # reject and die
-            return -1, self.c, True
+        return state, action, next_state, reward
 
 
-class FullMcCallModel(BaseMcCall):
-    """Too close to a bandit scenario
-    """
+class TimeDyna(VanillaDyna):
+    # @timeWeight: also called kappa, the weight for elapsed time in sampling
+    #              reward, it need to be small
+    def __init__(self, env, time_weight=1e-4):
+        super().__init__(env)
+        self.time_weight = time_weight
 
-    def step(self, ant, s, a):
-        if a == 0:  # accept
-            return s, s, False
-        else:
-            return self.draw_salary(), self.c, False
+    def feed(self, state, action, next_state, reward):
+        self.time += 1
+        if state not in self.model.keys():
+            self.model[state] = dict()
 
+            # Actions that had never been tried before from a state were
+            #   allowed to be considered in the planning step
+            for action_ in self.env.actions:
+                if action_ != action:
+                    # Such actions would lead back to the same state with a
+                    #   reward of zero
+                    # Notice that the minimum time stamp is 1 instead of 0
+                    self.model[state][action_] = [state, 0, 1]
 
-class HuggetModel(Model):
-    """Huget model of consumption and savings.
+        self.model[state][action] = [next_state, reward, self.time]
 
-    Based on the 1993 paper by Mark Hugget
-    https://doi.org/10.1016/0165-1889(93)90024-M
+    def sample(self):
+        state, action = self.sample_state_action()
+        next_state, reward, time = self.model[state][action]
 
-    Agents gain some stochastic income at every turn and chose some level of
-    consumption. Savings (or debt) is accrued with consumption, earning (or
-    costing) some interest rate.
-    """
+        # adjust reward with elapsed time since last vist
+        reward += self.time_weight * np.sqrt(self.time - time)
 
-    def __init__(self, draw_income_func, max_assets, max_debt, r=0.1):
-        self.draw_income = draw_income_func
-        self.max_debt = max_debt
-        self.R = 1 + r
-
-        self.actions = np.arange(0, max_assets+max_debt+1)
-
-    def reset(self, ant):
-        return self.draw_income(), 0, False
-
-    def step(self, ant, s, a):
-
-        # Keep in mind that ant.a are the agent's assets
-        # Can't consume more than your assets and the maximum debt
-        a = min(a, ant.a + self.max_debt)
-
-        # Accrue/pay interest
-        ant.a += self.R*(self.a - a)
-        # Get a salary draw
-        ant.a += self.draw_income()
-        ant.a = min(ant.a, self.max_assets)
-
-        return ant.a, ant.utility(a), False
-
-    def action_mask(self, ant):
-        return self.actions <= (ant.a + self.max_debt)
+        return state, action, next_state, reward
