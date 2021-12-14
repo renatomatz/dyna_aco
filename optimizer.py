@@ -237,6 +237,8 @@ class DynaQACO(DynaQ):
 
     def model_learn(self):
 
+        self.model.end_episodes()
+
         # sample experience from the model
         for t in range(0, self.planning_steps):
             state_, action_, next_state_, reward_ = self.model.sample()
@@ -246,6 +248,8 @@ class DynaQACO(DynaQ):
                    * np.max(self.q_value[next_state_, :])
                    - self.q_value[state_, action_])
             )
+
+        self.model.evaporate()
 
 
 def dump_opt(opt, file_name):

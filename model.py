@@ -169,15 +169,18 @@ class DynaACO(NonDetermTimeDyna):
         # affect the new values.
         super().__init__(env, time_weight=time_weight/nu)
 
+        # This is done for the weighted sum of rewards.
         ab_tot = alpha + beta
         self.alpha = alpha / ab_tot
         self.beta = beta / ab_tot
+
+        self.nu = nu
 
     def reset_pheromones(self):
         self.model["reward"]["pher"] = np.zeros(self.env.shape)
         self.model["dynamics"]["pher"] \
             = np.zeros(self.env.shape+(self.env.shape[0],))
-        self.model["visits"] = np.zeros(self.env.shape, int)
+        self.model["visits"]["pher"] = np.zeros(self.env.shape, int)
 
     def reset_model(self):
         self.model = {
@@ -185,32 +188,35 @@ class DynaACO(NonDetermTimeDyna):
                 "belf": np.zeros(self.env.shape),
             },
             "dynamics": {
-                "belf": np.zeros(self.env.shape+(self.env.shape[0],)),
+                # Initial beliefs are that all state transitions 
+                # are equally-likely
+                "belf": np.full(self.env.shape+(self.env.shape[0],), 
+                                1/self.env.shape[0]),
+            },
+            "visits": {
+                "belf": np.zeros(self.env.shape, int)
             }
         }
         self.reset_pheromones()
 
     def _visited_coords(self):
-        return (sum(self.model["dynamics"].values())
-                .sum(axis=2).flatten()) > 0
+        return sum(self.model["visits"].values()).flatten() > 0
 
     def _get_visits(self, state, action):
-        return max(1, self.model["visits"][state, action])
+        return max(1, self.model["visits"]["pher"][state, action])
 
     def _joined_rewards(self, state, action):
         # combine rewards as a linearly-weighted sum
         rewards = self.model["reward"]
-        return (self.alpha*(rewards["pher"][state, action]
-                            / self._get_visits(state, action))
-                + self.beta*rewards["belf"][state, action])
+        return ((self.alpha*rewards["pher"][state, action])
+                + (self.beta*rewards["belf"][state, action]))
 
     def _joined_dynamics(self, state, action):
         # combine dynamics as exponentially-weighted proportion
         # as outlined by the ACO algorithm
         dynamics = self.model["dynamics"]
-        joined = ((dynamics["pher"][state, action]
-                   / self._get_visits(state, action))**self.alpha
-                  + dynamics["belf"][state, action]**self.beta)
+        joined = ((dynamics["pher"][state, action]**self.alpha)
+                  * (dynamics["belf"][state, action]**self.beta))
         return joined / np.sum(joined)
 
     def sample_state_action(self, visited=None):
@@ -221,13 +227,13 @@ class DynaACO(NonDetermTimeDyna):
         coord = np.random.choice(np.arange(len(visited)),
                                  p=visited/visited.sum())
 
-        state = coord // self.env.shape[0]
-        action = coord % self.env.shape[0]
+        state = coord // self.env.shape[1]
+        action = coord % self.env.shape[1]
 
         return state, action
 
     def feed(self, state, action, next_state, reward):
-        self.model["visits"][state, action] += 1
+        self.model["visits"]["pher"][state, action] += 1
         self.model["reward"]["pher"][state, action] += reward
         self.model["dynamics"]["pher"][state, action, next_state] += 1
 
@@ -242,11 +248,41 @@ class DynaACO(NonDetermTimeDyna):
 
         return state, action, next_state, reward
 
-    def end_episode(self):
-        r_pher = self.model["reward"]["pher"]
-        r_pher[r_pher == 0] += self.time_weight
+    def end_episodes(self):
 
-        self.model["reward"]["belf"] *= (1 - self.tau)
-        self.model["reward"]["belf"] += self.tau*self.model["reward"]["pher"]
+        # avoid zero division
+        pher_visits = self.model["visits"]["pher"].copy()
+        pher_visits[pher_visits == 0] = 1
+
+        self.model["reward"]["pher"] /= pher_visits
+
+        D_pher = self.model["dynamics"]["pher"]
+        D_pher /= pher_visits[..., np.newaxis]
+
+        # uniform probabilities if state has not been seen
+        D_pher[D_pher.sum(axis=2) == 0] = 1/self.env.shape[0]
+
+    def evaporate(self):
+        """Evaporate pheromones towards beliefs. Notice how beliefs are 
+        "compressed" (updated by the actual expected values rather than
+        raw sums). This is done so for the sake of numerical stability.
+        """
+
+        # Evaporate rewards
+        R_pher = self.model["reward"]["pher"]
+        R_pher[R_pher == 0] += self.time_weight
+
+        self.model["reward"]["belf"] *= (1 - self.nu)
+        self.model["reward"]["belf"] += \
+            self.nu * R_pher
+
+        # Evaporate dynamics
+        self.model["dynamics"]["belf"] *= (1 - self.nu)
+        self.model["dynamics"]["belf"] += \
+            self.nu * self.model["dynamics"]["pher"]
+
+        # Evaporate visits. Keep only a record of visited coordinates.
+        self.model["visits"]["belf"] += self.model["visits"]["pher"]
+        self.model["visits"]["belf"] = (self.model["visits"]["belf"] > 0).astype(int)
 
         self.reset_pheromones()
