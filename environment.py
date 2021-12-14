@@ -22,6 +22,8 @@ class Environment:
 
     def __init__(self):
         self.actions = [0]
+
+        self._dist_config = None
         self._draw = np.random.random
 
     @property
@@ -32,7 +34,14 @@ class Environment:
         return self._draw()
 
     def set_dist(self, *args, **kwargs):
-        raise NotImplementedError()
+        self._dist_config = (args, kwargs)
+
+    def dump_dist(self):
+        self._draw = None
+
+    def load_dist(self):
+        args, kwargs = self._dist_config
+        self.set_dist(*args, **kwargs)
 
     def reset(self, agent):
         raise NotImplementedError()
@@ -74,6 +83,7 @@ class BaseMcCall(Environment):
         return (self.max_wage*2, 2)
 
     def set_dist(self, *args, **kwargs):
+        super().set_dist(*args, **kwargs)
         self._draw = lambda: betabinom(self.max_wage,
                                        *args, **kwargs).rvs(1)[0]
 
@@ -139,12 +149,13 @@ class HuggettModel(Environment):
     """
 
     def __init__(self, max_assets, max_debt, r=0.1):
+        super().__init__()
 
         self.max_assets = max_assets
         self.max_debt = max_debt
         self.R = 1 + r
 
-        self.actions = np.arange(0, max_assets+max_debt)
+        self.actions = np.arange(0, max_assets+max_debt+1)
 
         self.set_dist(200, 100)
 
@@ -152,9 +163,11 @@ class HuggettModel(Environment):
     def shape(self):
         # You can consume as much as you want.
         # First (max_debt) indices are for negative income
-        return (self.max_assets+self.max_debt,)*2
+        # Add an extra index to account for zero.
+        return (self.max_assets+self.max_debt+1,)*2
 
     def set_dist(self, *args, **kwargs):
+        super().set_dist(*args, **kwargs)
         self._draw = lambda: betabinom(self.max_assets // 10,
                                        *args, **kwargs).rvs(1)[0]
 
@@ -182,7 +195,7 @@ class HuggettModel(Environment):
         agent.a = min(agent.a, self.max_assets)
         agent.a = max(agent.a, 0)
 
-        return agent.a + self.max_debt, agent.utility(action), False
+        return self.max_debt + agent.a, agent.utility(action), False
 
     def possible_actions(self, agent):
         return self.actions[self.actions <= (agent.a + self.max_debt)]

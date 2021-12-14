@@ -36,6 +36,9 @@ class Agent:
 
     def discounted_rewards(self):
         """Return total lifetime value of this agent."""
+        if self.history == []:
+            return 0
+
         rewards = np.array(self.history, dtype=np.float64)[:, 2]
         return np.sum(rewards*(self.gamma**np.arange(len(rewards))))
 

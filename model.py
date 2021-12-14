@@ -160,3 +160,93 @@ class NonDetermTimeDyna(NonDetermVanillaDyna, TimeDyna):
                    * np.sqrt(self.time - self.model[state][action]["time"]))
 
         return state, action, next_state, reward
+
+
+class DynaACO(NonDetermTimeDyna):
+
+    def __init__(self, env, time_weight=1e-4, alpha=0.5, beta=0.5, nu=0.1):
+        # we divide the time weight over nu as we don't want evaporation to
+        # affect the new values.
+        super().__init__(env, time_weight=time_weight/nu)
+
+        ab_tot = alpha + beta
+        self.alpha = alpha / ab_tot
+        self.beta = beta / ab_tot
+
+    def reset_pheromones(self):
+        self.model["reward"]["pher"] = np.zeros(self.env.shape)
+        self.model["dynamics"]["pher"] \
+            = np.zeros(self.env.shape+(self.env.shape[0],))
+        self.model["visits"] = np.zeros(self.env.shape, int)
+
+    def reset_model(self):
+        self.model = {
+            "reward": {
+                "belf": np.zeros(self.env.shape),
+            },
+            "dynamics": {
+                "belf": np.zeros(self.env.shape+(self.env.shape[0],)),
+            }
+        }
+        self.reset_pheromones()
+
+    def _visited_coords(self):
+        return (sum(self.model["dynamics"].values())
+                .sum(axis=2).flatten()) > 0
+
+    def _get_visits(self, state, action):
+        return max(1, self.model["visits"][state, action])
+
+    def _joined_rewards(self, state, action):
+        # combine rewards as a linearly-weighted sum
+        rewards = self.model["reward"]
+        return (self.alpha*(rewards["pher"][state, action]
+                            / self._get_visits(state, action))
+                + self.beta*rewards["belf"][state, action])
+
+    def _joined_dynamics(self, state, action):
+        # combine dynamics as exponentially-weighted proportion
+        # as outlined by the ACO algorithm
+        dynamics = self.model["dynamics"]
+        joined = ((dynamics["pher"][state, action]
+                   / self._get_visits(state, action))**self.alpha
+                  + dynamics["belf"][state, action]**self.beta)
+        return joined / np.sum(joined)
+
+    def sample_state_action(self, visited=None):
+
+        if visited is None:
+            visited = self._visited_coords()
+
+        coord = np.random.choice(np.arange(len(visited)),
+                                 p=visited/visited.sum())
+
+        state = coord // self.env.shape[0]
+        action = coord % self.env.shape[0]
+
+        return state, action
+
+    def feed(self, state, action, next_state, reward):
+        self.model["visits"][state, action] += 1
+        self.model["reward"]["pher"][state, action] += reward
+        self.model["dynamics"]["pher"][state, action, next_state] += 1
+
+    def sample(self):
+        visited = self._visited_coords()
+        state, action = self.sample_state_action(visited=visited)
+
+        reward = self._joined_rewards(state, action)
+        dynamics = self._joined_dynamics(state, action)
+        next_state = np.random.choice(np.arange(len(dynamics)),
+                                      p=dynamics)
+
+        return state, action, next_state, reward
+
+    def end_episode(self):
+        r_pher = self.model["reward"]["pher"]
+        r_pher[r_pher == 0] += self.time_weight
+
+        self.model["reward"]["belf"] *= (1 - self.tau)
+        self.model["reward"]["belf"] += self.tau*self.model["reward"]["pher"]
+
+        self.reset_pheromones()
