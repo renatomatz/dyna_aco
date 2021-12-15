@@ -1,6 +1,3 @@
-import numpy as np
-import matplotlib.pyplot as plt
-
 from environment import HuggettModel
 from agent import HuggettAgent
 from optimizer import QLearning, DynaQ, dump_opt
@@ -25,7 +22,7 @@ time_dyna = NonDetermTimeDyna(hug, time_weight=1e-4)
 time_dyna_q = DynaQ(hug, agent, time_dyna, **dyna_params)
 
 fit_params = {
-    "iters": int(1e4),
+    "iters": int(1e2),
     "run_len": 20,
     "verbose": True
 }

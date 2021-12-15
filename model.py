@@ -1,14 +1,3 @@
-"""
-Copyright (C)
-2016-2018 Shangtong Zhang(zhangshangtong.cpp@gmail.com)
-2016 Kenta Shimada(hyperkentakun@gmail.com)
-Permission given to modify the code as long as you keep this
-declaration at the top
-
-Further modifications made by Renato Zimmermann(renatomatz@gmail.com)
-"""
-
-
 import numpy as np
 
 from environment import Environment
@@ -42,6 +31,19 @@ class Model:
     # randomly sample from previous experience
     def sample(self):
         raise NotImplementedError()
+
+
+"""
+Copyright (C)
+2016-2018 Shangtong Zhang(zhangshangtong.cpp@gmail.com)
+2016 Kenta Shimada(hyperkentakun@gmail.com)
+Permission given to modify the code as long as you keep this
+declaration at the top
+
+Further modifications made by Renato Zimmermann(renatomatz@gmail.com)
+
+Used Classes: VanillaDyna, TimeDyna
+"""
 
 
 class VanillaDyna(Model):
@@ -169,10 +171,8 @@ class DynaACO(NonDetermTimeDyna):
         # affect the new values.
         super().__init__(env, time_weight=time_weight/nu)
 
-        # This is done for the weighted sum of rewards.
-        ab_tot = alpha + beta
-        self.alpha = alpha / ab_tot
-        self.beta = beta / ab_tot
+        self.alpha = alpha
+        self.beta = beta
 
         self.nu = nu
 
@@ -188,9 +188,9 @@ class DynaACO(NonDetermTimeDyna):
                 "belf": np.zeros(self.env.shape),
             },
             "dynamics": {
-                # Initial beliefs are that all state transitions 
+                # Initial beliefs are that all state transitions
                 # are equally-likely
-                "belf": np.full(self.env.shape+(self.env.shape[0],), 
+                "belf": np.full(self.env.shape+(self.env.shape[0],),
                                 1/self.env.shape[0]),
             },
             "visits": {
@@ -208,12 +208,13 @@ class DynaACO(NonDetermTimeDyna):
     def _joined_rewards(self, state, action):
         # combine rewards as a linearly-weighted sum
         rewards = self.model["reward"]
-        return ((self.alpha*rewards["pher"][state, action])
-                + (self.beta*rewards["belf"][state, action]))
+        joined = ((self.alpha*rewards["pher"][state, action])
+                  + (self.beta*rewards["belf"][state, action]))
+        return joined / (self.alpha + self.beta)
 
     def _joined_dynamics(self, state, action):
         # combine dynamics as exponentially-weighted proportion
-        # as outlined by the ACO algorithm
+        # as outlined by the original ACO algorithm
         dynamics = self.model["dynamics"]
         joined = ((dynamics["pher"][state, action]**self.alpha)
                   * (dynamics["belf"][state, action]**self.beta))
@@ -227,6 +228,8 @@ class DynaACO(NonDetermTimeDyna):
         coord = np.random.choice(np.arange(len(visited)),
                                  p=visited/visited.sum())
 
+        # the (visited) array is flattened, so we must
+        # convert it back to a state-action pair
         state = coord // self.env.shape[1]
         action = coord % self.env.shape[1]
 
@@ -249,6 +252,8 @@ class DynaACO(NonDetermTimeDyna):
         return state, action, next_state, reward
 
     def end_episodes(self):
+        """Perform monte-carlo estimates on pheromones
+        """
 
         # avoid zero division
         pher_visits = self.model["visits"]["pher"].copy()
@@ -263,7 +268,7 @@ class DynaACO(NonDetermTimeDyna):
         D_pher[D_pher.sum(axis=2) == 0] = 1/self.env.shape[0]
 
     def evaporate(self):
-        """Evaporate pheromones towards beliefs. Notice how beliefs are 
+        """Evaporate pheromones towards beliefs. Notice how beliefs are
         "compressed" (updated by the actual expected values rather than
         raw sums). This is done so for the sake of numerical stability.
         """
@@ -283,6 +288,7 @@ class DynaACO(NonDetermTimeDyna):
 
         # Evaporate visits. Keep only a record of visited coordinates.
         self.model["visits"]["belf"] += self.model["visits"]["pher"]
-        self.model["visits"]["belf"] = (self.model["visits"]["belf"] > 0).astype(int)
+        self.model["visits"]["belf"] = \
+            (self.model["visits"]["belf"] > 0).astype(int)
 
         self.reset_pheromones()

@@ -18,7 +18,7 @@ mcm_aco_dyna = DynaACO(mcm, time_weight=1e-4)
 mcm_aco_dyna_q = DynaQACO(mcm, mcm_agent, mcm_aco_dyna, 10, **dyna_params)
 
 fit_params = {
-    "iters": int(1e3),
+    "iters": int(1e2),
     "run_len": 50,
     "verbose": True
 }
