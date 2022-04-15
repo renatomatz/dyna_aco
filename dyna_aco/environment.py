@@ -1,12 +1,13 @@
 """Define Environment classes, which generally models value assignment.
 
-Models are what agents use to assign values to states based on their
-expectations and instagentaneous rewards. This are where most of the
-economic models will be implemented, as they define how agents make choices.
+Environments determine the set of actions avaialable to a specific agent and
+control how agents affect a shared environment. Random states and distributions
+relating to state outcomes should be defined here and draws should also be
+uniformly performed within the class. Special attention must be taken when
+parallelizing agent decisions in shared environments to ensure random draws are
+independent and state updates are shared by all nodes.
 
-Models will additionally define the lifetime value of a certain history of
-model choices. This is necessary for pheromone updates as well as being useful
-statistics.
+This is where most of the economic models will be implemented.
 """
 
 import numpy as np
@@ -21,6 +22,7 @@ class Environment:
     """Abstract Environment class."""
 
     def __init__(self):
+        """Initialize Environment"""
         self.actions = [0]
 
         self._dist_config = None
@@ -28,32 +30,52 @@ class Environment:
 
     @property
     def shape(self):
+        """Shape of the complete action space in this environment. This is
+        mostly used for grid environments.
+        """
         raise NotImplementedError()
 
     def draw(self):
+        """Draw from distribution."""
         return self._draw()
 
     def set_dist(self, *args, **kwargs):
+        """Initialize distribution. Necessary to enable picking of this class.
+
+        This enables for effective model checkpointing and initializing
+        independent distributions in distributed nodes.
+        """
         self._dist_config = (args, kwargs)
 
     def dump_dist(self):
+        """Dump distribution for future re-use."""
         self._draw = None
 
     def load_dist(self):
+        """Load dumped distribution."""
         args, kwargs = self._dist_config
         self.set_dist(*args, **kwargs)
 
     def reset(self, agent):
+        """Reset model given an instanciated agent."""
         raise NotImplementedError()
 
     def step(self, agent, s, a):
+        """Take a step in the model given an instanciated agent."""
         raise NotImplementedError()
 
     def possible_actions(self, agent):
+        """Possible actions available to an instanciated agent."""
         return self.actions
 
     @staticmethod
     def _check_agent(agent):
+        """Check for compatibility of an instanciated agent to this
+        Environment.
+
+        This is important as agents are implemented to conform to specific
+        environment mechanics.
+        """
         pass
 
 
@@ -115,8 +137,6 @@ class McCallModel(BaseMcCall):
 
 
 class FullMcCallModel(BaseMcCall):
-    """Too close to a bandit scenario
-    """
 
     @property
     def shape(self):

@@ -1,10 +1,14 @@
 """Define Agent classes, which generally model agent behaviours.
 
-Agents are responsible for making decisions (traversing the state space) and
-updating world pheromones. The way on which these decisions and updates are
-made are up to the programmer, and can represent any kind of intuition or
-mechanic necessary. Agents should not change the world in any way other than
-updating its pheromones.
+Agents are responsible for making decisions (traversing the state space).
+The way on which these decisions are made are up to the programmer, and
+can represent any kind of intuition or mechanic necessary. Agents should
+not change the world in any way, only interact with it. World states are
+handled by the `Environment` class, which can be shared between agents.
+
+Agent attributes expose a mechanism for introducing agent heterogeneity into
+simulations. These can be set as necessary and be either static, deterministic
+or stochastic in nature.
 
 Other classes are defined here to allow parallel executions of the algorithm to
 have a similar interface as sequential executions.
@@ -31,7 +35,8 @@ class Agent:
         self.clear_history()
 
     def clear_history(self):
-        # (state, action, reward)
+        """Clear agent history"""
+        # (state, action, reward) list
         self.history = list()
 
     def discounted_rewards(self):
@@ -43,6 +48,7 @@ class Agent:
         return np.sum(rewards*(self.gamma**np.arange(len(rewards))))
 
     def start_episode(self):
+        """Perform any pre-episode representational updates"""
         pass
 
 
@@ -59,7 +65,7 @@ class McCallAgent(Agent):
 
     @property
     def is_dead(self):
-        """Return whether the agent is dead"""
+        """Return whether the agent is dead based on its death age"""
         return self.age >= self.death_age
 
     def start_episode(self):
@@ -67,6 +73,11 @@ class McCallAgent(Agent):
 
 
 class HuggettAgent(Agent):
+    """Hugget Agent class.
+
+    This class contains state and preference parameters used during decision
+    making in the Huggett model.
+    """
 
     def __init__(self, gamma=0.99, crra_gamma=1.5):
         super().__init__(gamma=gamma)
@@ -75,8 +86,11 @@ class HuggettAgent(Agent):
         self.a = 0
 
     def utility(self, c):
-        # Consumption of zero causes an error, so instead, just return a large
-        # negative number. We can interpret this as starvation.
+        """Return the CRRA Utility at a given instantaneous consumption level.
+
+        Consumption of zero causes an error, so instead, just return a large
+        negative number. We can interpret this as bankruptcy.
+        """
         c = max(c, 0.000001)
         return (c**(1-self.crra_gamma))/(1-self.crra_gamma)
 
