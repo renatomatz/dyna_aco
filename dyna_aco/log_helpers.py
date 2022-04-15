@@ -14,7 +14,7 @@ import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
 from matplotlib.axes import Axes
 
-from utils import assert_type
+from .utils import assert_type
 
 
 class LoggerType:

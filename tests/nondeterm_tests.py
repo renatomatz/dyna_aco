@@ -1,7 +1,10 @@
-from environment import HuggettModel
-from agent import HuggettAgent
-from optimizer import QLearning, DynaQ, dump_opt
-from model import NonDetermVanillaDyna, NonDetermTimeDyna
+import sys
+sys.path.insert(0, "..")
+
+from dyna_aco.environment import HuggettModel
+from dyna_aco.agent import HuggettAgent
+from dyna_aco.optimizer import QLearning, DynaQ, dump_opt
+from dyna_aco.model import NonDetermVanillaDyna, NonDetermTimeDyna
 
 
 hug = HuggettModel(20, 5, r=0.1)

@@ -1,7 +1,10 @@
+import sys
+sys.path.insert(0, "..")
+
 import numpy as np
 import matplotlib.pyplot as plt
 
-from optimizer import load_opt
+from dyna_aco.optimizer import load_opt
 
 
 mcm_q_learning = load_opt("mcm_q_learning")

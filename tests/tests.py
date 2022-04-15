@@ -1,10 +1,13 @@
+import sys
+sys.path.insert(0, "..")
+
 import numpy as np
 import matplotlib.pyplot as plt
 
-from environment import McCallModel
-from agent import McCallAgent
-from optimizer import QLearning, DynaQ, dump_opt
-from model import VanillaDyna, TimeDyna
+from dyna_aco.environment import McCallModel
+from dyna_aco.agent import McCallAgent
+from dyna_aco.optimizer import QLearning, DynaQ, dump_opt
+from dyna_aco.model import VanillaDyna, TimeDyna
 
 
 mcm = McCallModel(60, c=25)
@@ -13,7 +16,7 @@ agent = McCallAgent(np.inf, gamma=0.99)
 q_learning = QLearning(mcm, agent, alpha=0.9, eps=0.1)
 
 dyna_params = {
-    "alpha": 0.9, 
+    "alpha": 0.9,
     "eps": 0.1,
     "planning_steps": 50
 }

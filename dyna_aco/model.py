@@ -1,7 +1,7 @@
 import numpy as np
 
-from environment import Environment
-from utils import assert_type
+from .environment import Environment
+from .utils import assert_type
 
 
 class Model:

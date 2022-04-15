@@ -4,10 +4,10 @@ import numpy as np
 
 from time import time
 
-from model import Model
-from environment import Environment
-from agent import Agent
-from utils import assert_type
+from .model import Model
+from .environment import Environment
+from .agent import Agent
+from .utils import assert_type
 
 
 class Optimizer:

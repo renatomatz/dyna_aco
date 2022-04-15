@@ -1,6 +1,6 @@
 """Define Agent classes, which generally model agent behaviours.
 
-Agents are respondible for making decisions (traversing the state space) and
+Agents are responsible for making decisions (traversing the state space) and
 updating world pheromones. The way on which these decisions and updates are
 made are up to the programmer, and can represent any kind of intuition or
 mechanic necessary. Agents should not change the world in any way other than
@@ -12,7 +12,7 @@ have a similar interface as sequential executions.
 
 import numpy as np
 
-from utils import assert_type
+from .utils import assert_type
 
 
 class Agent:

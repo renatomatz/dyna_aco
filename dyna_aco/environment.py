@@ -13,8 +13,8 @@ import numpy as np
 
 from scipy.stats import betabinom
 
-from utils import assert_type
-from agent import McCallAgent, HuggettAgent
+from .utils import assert_type
+from .agent import McCallAgent, HuggettAgent
 
 
 class Environment:

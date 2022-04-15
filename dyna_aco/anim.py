@@ -3,7 +3,7 @@ import sys
 import matplotlib.pyplot as plt
 from matplotlib.gridspec import GridSpec
 
-from log_helpers import LivePlotter
+from .log_helpers import LivePlotter
 
 
 fig = plt.figure()

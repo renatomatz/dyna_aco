@@ -1,9 +1,12 @@
+import sys
+sys.path.insert(0, "..")
+
 import numpy as np
 
-from environment import McCallModel, HuggettModel
-from agent import McCallAgent, HuggettAgent
-from optimizer import DynaQACO
-from model import DynaACO
+from dyna_aco.environment import McCallModel, HuggettModel
+from dyna_aco.agent import McCallAgent, HuggettAgent
+from dyna_aco.optimizer import DynaQACO
+from dyna_aco.model import DynaACO
 
 dyna_params = {
     "alpha": 0.9,
