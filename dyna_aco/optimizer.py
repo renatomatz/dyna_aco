@@ -1,3 +1,10 @@
+"""Define Optimizer classes.
+
+Optimizer instances are the base of any simulation routine as they orchestrate
+all pieces of a reinforcement learning task.
+"""
+
+
 import pickle
 
 import numpy as np
@@ -11,8 +18,10 @@ from .utils import assert_type
 
 
 class Optimizer:
+    """Base Optimizer class."""
 
     def __init__(self, env, agent):
+        """Initialize Optimizer instance."""
         assert_type(env, Environment, var_name="env")
         assert_type(agent, Agent, var_name="agent", or_none=True)
         self._env = env
@@ -21,17 +30,21 @@ class Optimizer:
 
     @property
     def env(self):
+        """Environment instance attribute getter."""
         return self._env
 
     @property
     def agent(self):
+        """Agent instance/generator attribute getter."""
         return self._agent
 
     def clear_fit_log(self):
+        """Clear fitting log."""
         self.fit_log = list()
         self.fit_time = 0
 
     def fit(self, iters, run_len=np.inf, verbose=False):
+        """Run simulations and fit functions with necessary settings."""
 
         # History is erased for fitting
         self.clear_fit_log()
@@ -58,12 +71,15 @@ class Optimizer:
         self.fit_time = time() - start_time
 
     def test(self, iters, n_eps, verbose=False):
+        """Run tests using test settings."""
         raise NotImplementedError()
 
     def episode(self, state):
+        """Process and episode based on a specific environment state."""
         raise NotImplementedError()
 
     def __str__(self):
+        """String representation of Optimizer."""
         return (f"{type(self).__name__} "
                 f"[ E: {type(self.env).__name__} "
                 f"| A: {type(self.agent).__name__} ]")

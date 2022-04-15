@@ -1,3 +1,11 @@
+"""Define Model classes used in Dyna algorithm.
+
+Model instances define how agent experiences are integrated into state models
+in the various Dyna-like algorithms. These are used to train the actual Q
+functions and should be adapted to specific environment dynamics/mechanics.
+"""
+
+
 import numpy as np
 
 from .environment import Environment
@@ -5,8 +13,10 @@ from .utils import assert_type
 
 
 class Model:
-    # @env: the environment instance.
+    """Base model class."""
+
     def __init__(self, env):
+        """Initialize model"""
         # track total time
         self.time = 0
 
@@ -16,20 +26,33 @@ class Model:
 
     @property
     def env(self):
+        """Environment instance attribute getter."""
         return self._env
 
     def reset_model(self):
+        """Reset the model."""
         self.model = dict()
 
     # feed the model with previous experience
     def feed(self, state, action, next_state, reward):
+        """Feed the model new information and update its distribution.
+
+        This is called for every new agent experience and ultimately allows the
+        model to assimilate new information about the distribution, which will
+        ultimately affect how samples are drawn.
+        """
         raise NotImplementedError()
 
     def sample_state_action(self):
+        """Sample a random state/action pair from what has been previously
+        experienced.
+        """
         raise NotImplementedError()
 
-    # randomly sample from previous experience
     def sample(self):
+        """Sample full state, action, next state and reward sequence from
+        previously experience and fitted distribution.
+        """
         raise NotImplementedError()
 
 
@@ -67,8 +90,7 @@ class VanillaDyna(Model):
 
 
 class TimeDyna(VanillaDyna):
-    # @timeWeight: also called kappa, the weight for elapsed time in sampling
-    #              reward, it need to be small
+
     def __init__(self, env, time_weight=1e-4):
         super().__init__(env)
         self.time_weight = time_weight
